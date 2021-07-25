@@ -1,0 +1,136 @@
+#cloud-config
+package_upgrade: true
+package_reboot_if_required: true
+
+packages:
+  - ca-certificates
+  - wget
+  - net-tools
+  - gnupg
+  - strongswan
+  - libcharon-extra-plugins
+  - libcharon-extauth-plugins
+  - libstrongswan-extra-plugins
+  - haproxy
+
+users:
+  - name: vpn
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIDl7ai7a3TWPlmJeRRpeDRUCIBp7MrQTGPv5cuL4Ce5iqNav7CHNRHV2Sm8cHYkEKKAU25YrfspJGRULYQNDBwgUCEpGXlzRKnYRi9DGf72VTtVi6GVO3wQRxJp3PGKb8Uoy494mot0uHhIWrKsZF47JWV5IPrDsRJavanIhEtI7PA/lRnI6TxluyQAtfeIgsMPcwRbTWr2Lfgf29YRZUz7spI/+CMAZT7TT5M8jGO+NoF//tzC3xTyC6+pBc2AjUNLsh5RNP88iRgHMGKO3Sa+u5V5+qRUHcgo7VZtJ4VaY03ujgRVITXMkY78Oznoc8mXgUCBPq8kLsa7Q9tTZ/ rbresler@qba-pc
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    groups: sudo
+    shell: /bin/bash
+
+write_files:
+  - path: /etc/sysctl.conf
+    append: true
+    content: |
+      # IPsec
+      net.ipv4.ip_forward = 1
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.all.accept_redirects = 0
+
+  - path: /etc/ipsec.d/secrets/ipsec.${vpn_name}.secrets
+    content: |
+      # IPsec config
+      ${local_id} ${remote_id} : PSK ${pre_shared_key}
+
+  - path: /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+    content: |
+      config setup
+        charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2, mgr 2"
+        cachecrls=no
+        strictcrlpolicy=yes
+        uniqueids = yes
+
+      # Add connections here.
+      conn ${vpn_name}
+        ikelifetime=8h
+        keylife=20m
+        rekeymargin=1h
+        keyingtries=1
+        authby=psk
+        keyexchange=ikev2
+        dpdaction=restart
+        ${phase1_encryption}
+        ${phase2_encryption}
+        leftid=${local_id}
+        left=PUBLIC_IPV4
+        leftsubnet=PRIVATE_IPV4/32
+        leftsendcert=never
+        rightid=${remote_id}
+        right=%any
+        rightsubnet=${remote_subnet}
+        rightsendcert=never
+        auto=start
+
+  - path: /etc/haproxy/conf.d/00-resolvers.cfg
+    append: true
+    content: |
+      #
+      # DigitalOcean DNS resolvers
+      #
+      resolvers digitalocean
+        nameserver ns1 173.245.58.51:53
+        nameserver ns2 173.245.59.41:53
+        nameserver ns3 198.41.222.173:53
+      #
+
+  - path: /etc/haproxy/conf.d/01-webhooks.cfg
+    append: true
+    content: |
+      #
+      # Webhooks redirection
+      #
+      frontend webhooks-frontend
+        bind PRIVATE_IPV4:8000
+        mode http
+        default_backend webhooks-backend
+        http-request set-header Host 'api.dev.gyfted.dev'
+
+      backend webhooks-backend
+        balance roundrobin
+        server webhooks-dev api.dev.gyfted.dev:443 ssl verify none check resolvers digitalocean
+      #
+
+  - path: /root/setup-vpn.sh
+    content: |
+      #!/bin/bash 
+
+      export HOSTNAME=$(curl -s http://169.254.169.254/metadata/v1/hostname)
+      export PUBLIC_IPV4=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
+      export PRIVATE_IPV4=$(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
+
+      # Configure HAProxy
+      sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/haproxy/conf.d/01-webhooks.cfg
+      cat /etc/haproxy/conf.d/*.cfg >> /etc/haproxy/haproxy.cfg
+      haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
+
+      # Configure VPN ${vpn_name}
+      sed -i -e "s/HOSTNAME/$HOSTNAME/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+      sed -i -e "s/PUBLIC_IPV4/$PUBLIC_IPV4/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+      sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+      cat << EOF >> /etc/ipsec.secrets
+      include /etc/ipsec.d/secrets/ipsec.${vpn_name}.secrets
+      EOF
+      cat << EOF >> /etc/ipsec.conf
+      include /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+      EOF
+
+      systemctl restart strongswan-starter
+
+      # Firewall configuration
+      ufw allow OpenSSH
+      ufw allow 500,4500/udp
+      ufw allow proto esp from 138.68.7.222
+      ufw allow from ${remote_subnet} 8000/tcp
+      ufw enable
+      echo "finish setup"
+
+runcmd:
+  - sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i -e '$aAllowUsers vpn' /etc/ssh/sshd_config
+  - service ssh restart
+  - chmod +x /root/setup-vpn.sh && (${enable_provision} && ./root/setup-vpn.sh)
+
+final_message: cloud-init configuration completed!
