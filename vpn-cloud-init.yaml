@@ -86,11 +86,11 @@ write_files:
         bind PRIVATE_IPV4:8000
         mode http
         default_backend webhooks-backend
-        http-request set-header Host 'api.dev.gyfted.dev'
+        http-request set-header Host '${webhooks_endpoint}'
 
       backend webhooks-backend
         balance roundrobin
-        server webhooks-dev api.dev.gyfted.dev:443 ssl verify none check resolvers digitalocean
+        server webhooks-dev ${webhooks_endpoint}:${webhooks_port} ssl verify none check resolvers digitalocean
       #
 
   - path: /root/setup-vpn.sh
@@ -111,10 +111,10 @@ write_files:
       sed -i -e "s/PUBLIC_IPV4/$PUBLIC_IPV4/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
       sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
       cat << EOF >> /etc/ipsec.secrets
-      include /etc/ipsec.d/secrets/ipsec.${vpn_name}.secrets
+      include /etc/ipsec.d/secrets/ipsec.*.secrets
       EOF
       cat << EOF >> /etc/ipsec.conf
-      include /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+      include /etc/ipsec.d/conf/ipsec.*.conf
       EOF
 
       systemctl restart strongswan-starter
@@ -122,7 +122,7 @@ write_files:
       # Firewall configuration
       ufw allow OpenSSH
       ufw allow 500,4500/udp
-      ufw allow proto esp from 138.68.7.222
+      ufw allow proto esp from ${remote_public_address}
       ufw allow from ${remote_subnet} 8000/tcp
       ufw enable
       echo "finish setup"

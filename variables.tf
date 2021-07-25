@@ -68,8 +68,23 @@ variable "vpn_remote_id" {
   description = "VPN Remote (Right) ID"
 }
 
+variable "vpn_remote_address" {
+  type        = string
+  description = "VPN Remote (Right) Public address"
+}
+
 variable "vpn_remote_subnet" {
   type        = string
   description = "VPN Remote (Right) Subnet"
 }
 
+variable "webhooks_endpoint" {
+  type        = string
+  description = "Webhooks endpoint fqdn"
+}
+
+variable "webhooks_port" {
+  type        = string
+  description = "Webhooks endpoint port"
+  default     = "443"
+}

@@ -20,14 +20,17 @@ data "digitalocean_vpc" "vpc" {
 data "template_file" "user_data" {
   template = file("${path.module}/vpn-cloud-init.yaml")
   vars = {
-    enable_provision  = var.auto_config_node
-    vpn_name          = var.vpn_name
-    pre_shared_key    = var.vpn_pre_shared_key
-    phase1_encryption = var.vpn_phase1_encryption
-    phase2_encryption = var.vpn_phase2_encryption
-    local_id          = var.vpn_local_id
-    remote_id         = var.vpn_remote_id
-    remote_subnet     = var.vpn_remote_subnet
+    enable_provision      = var.auto_config_node
+    vpn_name              = var.vpn_name
+    pre_shared_key        = var.vpn_pre_shared_key
+    phase1_encryption     = var.vpn_phase1_encryption
+    phase2_encryption     = var.vpn_phase2_encryption
+    local_id              = var.vpn_local_id
+    remote_id             = var.vpn_remote_id
+    remote_subnet         = var.vpn_remote_subnet
+    webhooks_endpoint     = var.webhooks_endpoint
+    webhooks_port         = var.webhooks_port
+    remote_public_address = var.vpn_remote_address
   }
 }
 
