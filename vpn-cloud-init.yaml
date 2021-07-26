@@ -30,40 +30,6 @@ write_files:
       net.ipv4.conf.all.send_redirects = 0
       net.ipv4.conf.all.accept_redirects = 0
 
-  - path: /etc/ipsec.d/secrets/ipsec.secrets.tmpl
-    content: |
-      # IPsec config
-      $${local_id} $${remote_id} : PSK $${pre_shared_key}
-
-  - path: /etc/ipsec.d/conf/ipsec.conf.tmpl
-    content: |
-      config setup
-        charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2, mgr 2"
-        cachecrls=no
-        strictcrlpolicy=yes
-        uniqueids = yes
-
-      # Add connections here.
-      conn $${vpn_name}
-        ikelifetime=8h
-        keylife=20m
-        rekeymargin=1h
-        keyingtries=1
-        authby=psk
-        keyexchange=ikev2
-        dpdaction=restart
-        $${phase1_encryption}
-        $${phase2_encryption}
-        leftid=$${local_id}
-        left=$${local_public_ip}
-        leftsubnet=$${local_private_subnet}
-        leftsendcert=never
-        rightid=$${remote_id}
-        right=$${remote_public_address}
-        rightsubnet=$${remote_subnet}
-        rightsendcert=never
-        auto=start
-
   - path: /etc/haproxy/conf.d/00-resolvers.cfg
     append: true
     content: |
@@ -94,6 +60,39 @@ write_files:
       #
 
   - path: /root/setup-haproxy.sh
+
+  - path: /etc/ipsec.d/secrets/ipsec.secrets.tpl
+    content: |
+      # IPsec config
+      $${local_id} $${remote_id} : PSK $${pre_shared_key}
+
+  - path: /etc/ipsec.d/conf/ipsec.conf.tpl
+    content: |
+      config setup
+        charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2, mgr 2"
+        cachecrls=no
+        strictcrlpolicy=yes
+        uniqueids = yes
+
+      # Add connections here.
+      conn $${vpn_name}
+        ikelifetime=8h
+        keylife=20m
+        rekeymargin=1h
+        keyingtries=1
+        authby=psk
+        keyexchange=ikev2
+        dpdaction=restart
+        $${phase1_encryption}
+        $${phase2_encryption}
+        leftid=$${local_id}
+        left=$${local_public_ip}
+        leftsubnet=$${local_private_subnet}
+        leftsendcert=never
+        rightid=$${remote_id}
+        right=$${remote_public_address}
+        rightsubnet=$${remote_subnet}
+        rightsendcert=never
     permissions: 0755
     content: |
       #!/bin/bash 
@@ -103,6 +102,7 @@ write_files:
       cat /etc/haproxy/conf.d/*.cfg >> /etc/haproxy/haproxy.cfg
       haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
       
+        auto=start
   - path: /root/setup-vpn.sh
     permissions: 0755
     content: |
