@@ -27,10 +27,10 @@ data "template_file" "user_data" {
     phase2_encryption     = var.vpn_phase2_encryption
     local_id              = var.vpn_local_id
     remote_id             = var.vpn_remote_id
+    remote_public_address = var.vpn_remote_address
     remote_subnet         = var.vpn_remote_subnet
     webhooks_endpoint     = var.webhooks_endpoint
     webhooks_port         = var.webhooks_port
-    remote_public_address = var.vpn_remote_address
   }
 }
 

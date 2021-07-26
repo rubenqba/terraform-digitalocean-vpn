@@ -59,7 +59,7 @@ write_files:
         leftsubnet=PRIVATE_IPV4/32
         leftsendcert=never
         rightid=${remote_id}
-        right=%any
+        right=${remote_public_address}
         rightsubnet=${remote_subnet}
         rightsendcert=never
         auto=start
@@ -123,7 +123,7 @@ write_files:
       ufw allow OpenSSH
       ufw allow 500,4500/udp
       ufw allow proto esp from ${remote_public_address}
-      ufw allow from ${remote_subnet} 8000/tcp
+      ufw allow from ${remote_subnet} proto tcp to $PRIVATE_IPV4 port 8000
       ufw enable
       echo "finish setup"
 
