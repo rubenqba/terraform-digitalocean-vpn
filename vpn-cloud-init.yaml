@@ -30,12 +30,12 @@ write_files:
       net.ipv4.conf.all.send_redirects = 0
       net.ipv4.conf.all.accept_redirects = 0
 
-  - path: /etc/ipsec.d/secrets/ipsec.${vpn_name}.secrets
+  - path: /etc/ipsec.d/secrets/ipsec.secrets.tmpl
     content: |
       # IPsec config
-      ${local_id} ${remote_id} : PSK ${pre_shared_key}
+      $${local_id} $${remote_id} : PSK $${pre_shared_key}
 
-  - path: /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+  - path: /etc/ipsec.d/conf/ipsec.conf.tmpl
     content: |
       config setup
         charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2, mgr 2"
@@ -44,7 +44,7 @@ write_files:
         uniqueids = yes
 
       # Add connections here.
-      conn ${vpn_name}
+      conn $${vpn_name}
         ikelifetime=8h
         keylife=20m
         rekeymargin=1h
@@ -52,15 +52,15 @@ write_files:
         authby=psk
         keyexchange=ikev2
         dpdaction=restart
-        ${phase1_encryption}
-        ${phase2_encryption}
-        leftid=${local_id}
-        left=PUBLIC_IPV4
-        leftsubnet=PRIVATE_IPV4/32
+        $${phase1_encryption}
+        $${phase2_encryption}
+        leftid=$${local_id}
+        left=$${local_public_ip}
+        leftsubnet=$${local_private_subnet}
         leftsendcert=never
-        rightid=${remote_id}
-        right=${remote_public_address}
-        rightsubnet=${remote_subnet}
+        rightid=$${remote_id}
+        right=$${remote_public_address}
+        rightsubnet=$${remote_subnet}
         rightsendcert=never
         auto=start
 
@@ -93,44 +93,89 @@ write_files:
         server webhooks-dev ${webhooks_endpoint}:${webhooks_port} ssl verify none check resolvers digitalocean
       #
 
-  - path: /root/setup-vpn.sh
+  - path: /root/setup-haproxy.sh
+    permissions: 0755
     content: |
       #!/bin/bash 
-
-      export HOSTNAME=$(curl -s http://169.254.169.254/metadata/v1/hostname)
-      export PUBLIC_IPV4=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
-      export PRIVATE_IPV4=$(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
 
       # Configure HAProxy
       sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/haproxy/conf.d/01-webhooks.cfg
       cat /etc/haproxy/conf.d/*.cfg >> /etc/haproxy/haproxy.cfg
       haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
+      
+  - path: /root/setup-vpn.sh
+    content: |
+      #!/bin/bash
 
-      # Configure VPN ${vpn_name}
-      sed -i -e "s/HOSTNAME/$HOSTNAME/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
-      sed -i -e "s/PUBLIC_IPV4/$PUBLIC_IPV4/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
-      sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/ipsec.d/conf/ipsec.${vpn_name}.conf
+      while getopts ":n:i:r:a:s:k:e:d:" o; do
+        case "$${o}" in
+          n)
+            export vpn_name=$${OPTARG}
+            ;;
+          i)
+            export local_id=$${OPTARG}
+            ;;
+          r)
+            export remote_id=$${OPTARG}
+            ;;
+          a)
+            export remote_public_address=$${OPTARG}
+            ;;
+          s)
+            export remote_subnet=$${OPTARG}
+            ;;
+          k)
+            export pre_shared_key=$${OPTARG}
+            ;;
+          e)
+            export phase1_encryption=$${OPTARG}
+            ;;
+          d)
+            export phase2_encryption=$${OPTARG}
+            ;;
+          *)
+            usage
+            ;;
+        esac
+      done
+      shift $$((OPTIND-1))
+
+      if [ -z "$${n}" ] || [ -z "$${a}" ] || [ -z "$${s}" ]; then
+        usage
+      fi
+
+      export local_hostname=$(curl -s http://169.254.169.254/metadata/v1/hostname)
+      export local_public_ip=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
+      export local_private_ip=$(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
+      export local_private_subnet="$${local_private_ip}/32"
+
+      envsubst < /etc/ipsec.d/secrets/ipsec.secrets.tpl > /etc/ipsec.d/secrets/ipsec.$${vpn_name}.secrets
+      envsubst < /etc/ipsec.d/conf/ipsec.conf.tpl > /etc/ipsec.d/conf/ipsec.$${vpn_name}.conf
+
       cat << EOF >> /etc/ipsec.secrets
-      include /etc/ipsec.d/secrets/ipsec.*.secrets
+      include /etc/ipsec.d/secrets/ipsec.$${vpn_name}.secrets
       EOF
       cat << EOF >> /etc/ipsec.conf
-      include /etc/ipsec.d/conf/ipsec.*.conf
+      include /etc/ipsec.d/conf/ipsec.$${vpn_name}.conf
       EOF
 
       systemctl restart strongswan-starter
 
       # Firewall configuration
-      ufw allow OpenSSH
-      ufw allow 500,4500/udp
-      ufw allow proto esp from ${remote_public_address}
-      ufw allow from ${remote_subnet} proto tcp to $PRIVATE_IPV4 port 8000
-      ufw enable
+      ufw allow proto esp from $${remote_public_address}
+      ufw allow from $${remote_subnet} proto tcp to $${local_private_ip} port 8000
+
       echo "finish setup"
+
 
 runcmd:
   - sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
   - sed -i -e '$aAllowUsers vpn' /etc/ssh/sshd_config
   - service ssh restart
-  - chmod +x /root/setup-vpn.sh && (${enable_provision} && ./root/setup-vpn.sh)
+  - ufw allow OpenSSH
+  - ufw allow 500,4500/udp
+  - ufw enable
+  - /root/setup-haproxy.sh
+  - ${enable_provision} && /root/setup-vpn.sh -n '${vpn_name}' -a '${remote_public_address}' -s '${remote_subnet}' -k '${pre_shared_key' -e '${phase1_encryption}' -d '${phase2_encryption}'
 
 final_message: cloud-init configuration completed!
