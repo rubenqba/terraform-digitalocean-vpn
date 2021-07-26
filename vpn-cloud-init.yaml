@@ -139,7 +139,7 @@ write_files:
             ;;
         esac
       done
-      shift $$((OPTIND-1))
+      shift $((OPTIND-1))
 
       if [ -z "$${n}" ] || [ -z "$${a}" ] || [ -z "$${s}" ]; then
         usage
