@@ -70,7 +70,8 @@ variable "vpn_remote_id" {
 
 variable "vpn_remote_address" {
   type        = string
-  description = "VPN Remote (Right) Public address"
+  description = "VPN Remote (Right) Public address, not used if auto_config_node=false"
+  default     = ""
 }
 
 variable "vpn_remote_subnet" {
@@ -80,7 +81,8 @@ variable "vpn_remote_subnet" {
 
 variable "webhooks_endpoint" {
   type        = string
-  description = "Webhooks endpoint fqdn"
+  description = "Webhooks endpoint fqdn, not used if auto_config_node"
+  default     = ""
 }
 
 variable "webhooks_port" {
