@@ -104,6 +104,7 @@ write_files:
       haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
       
   - path: /root/setup-vpn.sh
+    :permissions: 0755
     content: |
       #!/bin/bash
 
