@@ -153,7 +153,7 @@ write_files:
       done
       shift $((OPTIND-1))
 
-      if [ -z "$${vpn_name}" ] || [ -z "$${local_id}" ] || [ -z "$${remote_id}" ] || [ -z "$${remote_public_address}" ]
+      if [ -z "$${vpn_name}" ] || [ -z "$${local_id}" ] || [ -z "$${remote_id}" ] || [ -z "$${remote_public_address}" ] \
         || [ -z "$${remote_subnet}" ] || [ -z "$${pre_shared_key}" ] || [ -z "$${phase1_encryption}" ] || [ -z "$${phase2_encryption}" ]; then
         usage
       fi
