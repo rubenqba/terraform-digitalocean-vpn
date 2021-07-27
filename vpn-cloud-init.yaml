@@ -60,6 +60,14 @@ write_files:
       #
 
   - path: /root/setup-haproxy.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash 
+
+      # Configure HAProxy
+      sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/haproxy/conf.d/01-webhooks.cfg
+      cat /etc/haproxy/conf.d/*.cfg >> /etc/haproxy/haproxy.cfg
+      haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
 
   - path: /etc/ipsec.d/secrets/ipsec.secrets.tpl
     content: |
@@ -92,17 +100,9 @@ write_files:
         rightid=$${remote_id}
         right=$${remote_public_address}
         rightsubnet=$${remote_subnet}
-        rightsendcert=never
-    permissions: 0755
-    content: |
-      #!/bin/bash 
-
-      # Configure HAProxy
-      sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/haproxy/conf.d/01-webhooks.cfg
-      cat /etc/haproxy/conf.d/*.cfg >> /etc/haproxy/haproxy.cfg
-      haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
-      
+        rightsendcert=never      
         auto=start
+
   - path: /root/setup-vpn.sh
     permissions: 0755
     content: |
@@ -110,7 +110,7 @@ write_files:
 
       usage() { 
         echo -e "Usage: $0 \n -s <arg> -i <arg> -r <arg> -a <arg> -s <arg> -k <arg> -e <arg> -d <arg>\n \
-        \t-s <name>\tVPN name to recognize it in IPSec ops \n \
+        \t-n <name>\tVPN name to recognize it in IPSec ops \n \
         \t-i <LOCAL-ID>\tID for secret file\n \
         \t-r <REMOTE-ID>\tremote ID for secret file\n \
         \t-a <remote address>\tremote public address\n \
