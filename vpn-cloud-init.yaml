@@ -65,7 +65,8 @@ write_files:
       #!/bin/bash 
 
       # Configure HAProxy
-      sed -i -e "s/PRIVATE_IPV4/$PRIVATE_IPV4/" /etc/haproxy/conf.d/01-webhooks.cfg
+      export local_private_ip=$(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
+      sed -i -e "s/PRIVATE_IPV4/$local_private_ip/" /etc/haproxy/conf.d/01-webhooks.cfg
       cat /etc/haproxy/conf.d/*.cfg >> /etc/haproxy/haproxy.cfg
       haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy
 
