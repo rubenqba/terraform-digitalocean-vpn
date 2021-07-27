@@ -108,7 +108,19 @@ write_files:
     content: |
       #!/bin/bash
 
-      while getopts ":n:i:r:a:s:k:e:d:" o; do
+      usage() { 
+        echo -e "Usage: $0 \n -s <arg> -i <arg> -r <arg> -a <arg> -s <arg> -k <arg> -e <arg> -d <arg>\n \
+        \t-s <name>\tVPN name to recognize it in IPSec ops \n \
+        \t-i <LOCAL-ID>\tID for secret file\n \
+        \t-r <REMOTE-ID>\tremote ID for secret file\n \
+        \t-a <remote address>\tremote public address\n \
+        \t-s <remote subnet>\tremote private subnet to expose to the VPN\n \
+        \t-k <shared key>\tPre-Shared key used to authenticate peers\n \
+        \t-e <algs phase 1>\tPhase 1 Authentication, i.e 'ike=aes256-md5-modp1024'\n \
+        \t-d <algs phase 2>\tPhase 2 Authentication, i.e 'esp=aes256-sha256'\n" 1>&2; exit 1; 
+      }
+
+      while getopts "n:i:r:a:s:k:e:d:" o; do
         case "$${o}" in
           n)
             export vpn_name=$${OPTARG}
@@ -141,7 +153,8 @@ write_files:
       done
       shift $((OPTIND-1))
 
-      if [ -z "$${n}" ] || [ -z "$${a}" ] || [ -z "$${s}" ]; then
+      if [ -z "$${vpn_name}" ] || [ -z "$${local_id}" ] || [ -z "$${remote_id}" ] || [ -z "$${remote_public_address}" ]
+        || [ -z "$${remote_subnet}" ] || [ -z "$${pre_shared_key}" ] || [ -z "$${phase1_encryption}" ] || [ -z "$${phase2_encryption}" ]; then
         usage
       fi
 
