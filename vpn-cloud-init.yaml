@@ -190,6 +190,7 @@ runcmd:
   - ufw allow 500,4500/udp
   - ufw enable
   - /root/setup-haproxy.sh
+  - echo "/root/setup-vpn.sh -n '${vpn_name}' -a '${remote_public_address}' -s '${remote_subnet}' -k '${pre_shared_key}' -e '${phase1_encryption}' -d '${phase2_encryption}'"
   - ${enable_provision} && /root/setup-vpn.sh -n '${vpn_name}' -a '${remote_public_address}' -s '${remote_subnet}' -k '${pre_shared_key}' -e '${phase1_encryption}' -d '${phase2_encryption}'
 
 final_message: cloud-init configuration completed!
